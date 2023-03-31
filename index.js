@@ -6,7 +6,7 @@ const weather = require("weather-js");
 const playStore = require("google-play-scraper");
 const translate = require("node-google-translate-skidz");
 const math = require("mathjs");
-const Twit = require('twit');
+const whois = require("whois-json");
 import("isomorphic-fetch");
 
 const app = express();
@@ -319,10 +319,10 @@ http: app.get("/dictionary", async function (req, res) {
   }
 });
 
-app.get("/discord-invite", async function (req, res) {
-  const invite = req.query.invite;
+app.get("/discord/invite/:invite", async function (req, res) {
+  const invite = req.params.invite;
   if (!invite) {
-    res.status(400).send({ error: "invite parameter is missing" });
+    res.status(400).send({ error: "Invite parameter is missing" });
     return;
   }
 
@@ -417,6 +417,24 @@ app.get("/ip", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send("Something went wrong");
+  }
+});
+
+app.get("/whois", async (req, res) => {
+  const { domain } = req.query;
+
+  if (!domain) {
+    res.status(400).send("No domain provided");
+    return;
+  }
+
+  try {
+    const result = await whois(domain);
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error looking up WHOIS information");
   }
 });
 
@@ -577,6 +595,101 @@ app.get("/roblox/user", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send("Error searching for Roblox user");
+  }
+});
+
+app.get("/minecraft/user", async (req, res) => {
+  const { username } = req.query;
+
+  if (!username) {
+    res.status(400).send("No username provided");
+    return;
+  }
+
+  try {
+    const uuidResponse = await axios.get(
+      `https://api.mojang.com/users/profiles/minecraft/${username}`
+    );
+    const uuid = uuidResponse.data.id;
+
+    const profileResponse = await axios.get(
+      `https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`
+    );
+    const profile = JSON.parse(
+      Buffer.from(profileResponse.data.properties[0].value, "base64").toString()
+    );
+
+    const skinResponse = await axios.get(
+      `https://crafatar.com/renders/body/${uuid}?size=512&default=MHF_Steve&overlay`
+    );
+
+    res.json({
+      username: profile.name,
+      uuid: profile.id,
+      skinUrl: skinResponse.request.res.responseUrl,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error searching for Minecraft user");
+  }
+});
+
+app.get("/minecraft/server", async (req, res) => {
+  const { ip } = req.query;
+
+  if (!ip) {
+    res.status(400).send("No IP address provided");
+    return;
+  }
+
+  try {
+    const statusResponse = await axios.get(`https://api.mcsrvstat.us/2/${ip}`);
+
+    const { online, players, version, motd } = statusResponse.data;
+
+    let playerList = [];
+    if (players && players.list) {
+      playerList = players.list;
+    }
+
+    res.json({
+      online,
+      playerCount: playerList.length,
+      players: playerList,
+      version,
+      motd,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error searching for Minecraft server");
+  }
+});
+
+app.get("/currency-convert", async (req, res) => {
+  const { from, to, amount } = req.query;
+
+  if (!from || !to || !amount) {
+    res.status(400).send("Invalid parameters");
+    return;
+  }
+
+  try {
+    const response = await axios.get(
+      `https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/${from}/${to}.json`
+    );
+
+    const conversionRate = response.data[to];
+    const convertedAmount = amount * conversionRate;
+
+    res.json({
+      from,
+      to,
+      amount: parseFloat(amount),
+      convertedAmount: parseFloat(convertedAmount.toFixed(2)),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ error: "Something went wrong" });
   }
 });
 
