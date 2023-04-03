@@ -7,7 +7,6 @@ const playStore = require("google-play-scraper");
 const translate = require("node-google-translate-skidz");
 const math = require("mathjs");
 const whois = require("whois-json");
-import("isomorphic-fetch");
 
 const app = express();
 const port = 80;
@@ -18,7 +17,117 @@ app.use((req, res, next) => {
 });
 
 app.get("/", async (req, res) => {
-  res.send("Ok");
+  res.send({ Ok: "Ok" });
+});
+
+app.get("/proxy", async (req, res) => {
+  const originalUrl = req.query.url;
+
+  if (!originalUrl) {
+    return res.status(400).send("URL parameter is missing");
+  }
+
+  // Check if originalUrl is a valid URL
+  try {
+    new URL(originalUrl);
+  } catch (err) {
+    console.error(err);
+    return res.status(400).send("Invalid URL");
+  }
+
+  try {
+    // Fetch the proxied HTML response
+    const response = await axios.get(originalUrl, { responseType: "text" });
+
+    // Modify all href and src attributes
+    const modifiedHtml = response.data
+      .replace(/href="\/\/(.*?)"/g, `href="https://$1"`)
+      .replace(/src="\/\/(.*?)"/g, `src="https://$1"`)
+      .replace(/href="\/(.*?)"/g, `href="${originalUrl}/$1"`)
+      .replace(/src="\/(.*?)"/g, `src="${originalUrl}/$1"`);
+
+    // Send the modified HTML response
+    res.send(modifiedHtml);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error");
+  }
+});
+
+app.get("/fake-name", async (req, res) => {
+  try {
+    const query = req.query;
+    const url = "https://api.namefake.com/";
+
+    // Set up the request parameters
+    const params = {};
+    if (query.full_name) {
+      params.name = query.full_name;
+    }
+    if (query.address) {
+      params.address = query.address;
+    }
+    if (query.email) {
+      params.email = query.email;
+    }
+    if (query.username) {
+      params.username = query.username;
+    }
+    if (query.password) {
+      params.password = query.password;
+    }
+    if (query.gender) {
+      params.gender = query.gender;
+    }
+    if (query.title) {
+      params.title = query.title;
+    }
+    if (query.birth_date) {
+      params.birth_date = query.birth_date;
+    }
+    if (query.phone) {
+      params.phone = query.phone;
+    }
+    if (query.country) {
+      params.country = query.country;
+    }
+    if (query.credit_card_type) {
+      params.credit_card_type = query.credit_card_type;
+    }
+    if (query.credit_card_number) {
+      params.credit_card_number = query.credit_card_number;
+    }
+    if (query.expires) {
+      params.expires = query.expires;
+    }
+    if (query.cv2) {
+      params.cv2 = query.cv2;
+    }
+    if (query.company) {
+      params.company = query.company;
+    }
+    if (query.industry) {
+      params.industry = query.industry;
+    }
+    if (query.catch_phrase) {
+      params.catch_phrase = query.catch_phrase;
+    }
+    if (query.bs) {
+      params.bs = query.bs;
+    }
+    if (query.description) {
+      params.description = query.description;
+    }
+
+    // Make the request
+    const response = await axios.get(url, { params });
+
+    // Send the response
+    res.json(response.data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error");
+  }
 });
 
 app.get("/weather", async (req, res) => {
@@ -133,6 +242,36 @@ app.get("/snapcode", (req, res) => {
       res.send(body);
     }
   );
+});
+
+app.get("/liveshot", async (req, res) => {
+  try {
+    const url = req.query.url;
+    if (!url) {
+      throw new Error("Missing required query parameter: url");
+    }
+    // Validate URL format
+    const urlRegex =
+      /^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?$/i;
+    if (!urlRegex.test(url)) {
+      throw new Error("Invalid URL format");
+    }
+    const response = await axios.get(
+      `https://urlscan.io/liveshot/?url=${encodeURIComponent(url)}`,
+      {
+        responseType: "arraybuffer",
+      }
+    );
+    const imageBuffer = Buffer.from(response.data, "binary");
+    res.writeHead(200, {
+      "Content-Type": "image/png",
+      "Content-Length": imageBuffer.length,
+    });
+    res.end(imageBuffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ error: error.message });
+  }
 });
 
 app.get("/time-difference", (req, res) => {
@@ -300,7 +439,7 @@ app.get("/urban", async function (req, res) {
   }
 });
 
-http: app.get("/dictionary", async function (req, res) {
+app.get("/dictionary", async function (req, res) {
   const search = req.query.word;
   if (!search) {
     res.status(400).send({ error: "Word parameter is missing" });
@@ -693,10 +832,72 @@ app.get("/currency-convert", async (req, res) => {
   }
 });
 
+app.get("/genshin/:category", async (req, res) => {
+  const { category } = req.params;
+  const apiUrl = `https://api.genshin.dev/${category}`;
+
+  try {
+    const response = await axios.get(apiUrl);
+    res.json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      types: [
+        "artifacts",
+        "boss",
+        "characters",
+        "consumables",
+        "domains",
+        "elements",
+        "enemies",
+        "materials",
+        "nations",
+        "weapons",
+      ],
+    });
+  }
+});
+
+app.get("/trivia", async (req, res) => {
+  try {
+    const response = await axios.get("https://opentdb.com/api.php", {
+      params: {
+        ...req.query,
+      },
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error getting trivia data");
+  }
+});
+
+app.get("/pokemon*", async (req, res) => {
+  try {
+    const original = req.originalUrl;
+    const defined = original.replace("/pokemon", "");
+    const url = `https://pokeapi.co/api/v2/${defined}`;
+    const response = await axios.get(url);
+    res.json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(error.response.status || 500).send(error.message);
+  }
+});
+
+const localtunnel = require("localtunnel");
+
+(async () => {
+  const tunnel = await localtunnel({ port: 80, subdomain: "apiresplendent" });
+  const url = tunnel.url;
+  console.log(url);
+})();
+
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
 
-process.on("uncaughtException", function(err) {
+process.on("uncaughtException", function (err) {
   console.log("NOT STOPPING: " + err);
 });
