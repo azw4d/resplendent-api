@@ -886,14 +886,6 @@ app.get("/pokemon*", async (req, res) => {
   }
 });
 
-const localtunnel = require("localtunnel");
-
-(async () => {
-  const tunnel = await localtunnel({ port: 80, subdomain: "apiresplendent" });
-  const url = tunnel.url;
-  console.log(url);
-})();
-
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
